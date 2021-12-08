@@ -1,0 +1,81 @@
+---
+title: "Homework2_Lorenzo Rossi"
+author: "Lorenzo Rossi"
+date: "05/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Contingency Table and Shiny
+
+```{r cars, echo=TRUE}
+library(ISLR)
+library(tidyverse)
+library(Rfast)
+library(CTAShiny)
+library(shiny)
+#Contingency table
+Disability <- read.delim("C:/Users/loren/Desktop/Lezioni uni/Adv Multivariate Statistics/R practise/Disability.csv")
+
+dis <- Disability
+table <- table(dis$Age, dis$Disability)
+
+table
+
+mosaicplot(table)
+
+CTAShiny::CTAShiny()
+
+```
+Just be looking at the contingency table it's possible to see an high number of individuals whose disability is limiting in the older age gaps. This is confirmed by the Shiny output if data from the table are used in the app. The Pearson's Chi-squared Test shows an high X-squared value and an extremely low p-value, thus rejecting the Null hypothesis that Age and Disability are independent. Moreover, the association plot gives a clear graphical representaion of the more frequent presence of limitating disabilities in higher age.
+
+```{r pressure, echo=FALSE, fig.cap="Shiny output 1", out.width=}
+knitr::include_graphics("C:\\Users\\loren\\Desktop\\Lezioni uni\\Adv Multivariate Statistics\\R practise\\Screenshot 2021-12-06 001954.jpg")
+knitr::include_graphics("C:\\Users\\loren\\Desktop\\Lezioni uni\\Adv Multivariate Statistics\\R practise\\Screenshot 2021-12-06 001926.jpg")
+```
+
+If the None category is removed, the situation changes. Looking at the Chi-squared test, the Null hypothesis is still rejected, but graphically the age gap most affected by limitating disabilities is the one between 45-54 years, which was still affected in the previous analysis, but with a lower value than older individuals. This may happen because, looking at the data, this age gap presented an higher number of people in the None category.
+
+```{r pressure, echo=FALSE, fig.cap="Shiny output 2", out.width = '100%'}
+knitr::include_graphics("C:\\Users\\loren\\Desktop\\Lezioni uni\\Adv Multivariate Statistics\\R practise\\Screenshot 2021-12-06 002259.jpg")
+knitr::include_graphics("C:\\Users\\loren\\Desktop\\Lezioni uni\\Adv Multivariate Statistics\\R practise\\Screenshot 2021-12-06 002352.jpg")
+```
+
+---
+Multidimensional Scaling
+
+```{r pressure, echo=TRUE}
+library(MASS)
+library(BBmisc)
+
+Yogurt <- read.delim("C:/Users/loren/Desktop/Lezioni uni/Adv Multivariate Statistics/R practise/Yogurt.csv")
+
+yg <- Yogurt
+#multi dim scaling
+normYG <- normalize(yg, method = "range", range = c(0, 1))
+distYG <- dist(normYG, method = 'euclidean')
+
+distYG
+
+multi_scale <- cmdscale(distYG, eig = TRUE, k = 20)
+
+multi_scale
+
+P2_criterion <- sum(abs(multi_scale$eig[1:2]))/sum(abs(multi_scale$eig))
+P2_criterion
+
+Mardia_criterion <- sum((multi_scale$eig[1:2])^2)/sum((multi_scale$eig)^2)
+Mardia_criterion
+
+Mardia_criterion > P2_criterion 
+
+plot(multi_scale$points[,1], multi_scale$points[,2], xlab = "Coordinate 1", 
+     ylab = 'Coordinate 2', type = 'n', xlim = range(-1,1), ylim = range(-1,1),
+     main = 'Metric Multidimensional Scale') 
+text(multi_scale$points[,1], multi_scale$points[,2], labels = yg$Brand)
+```
+
+By applying the multidimensional scaling, the plot shows the level of similarity among the Brands. It's possible to see a big cluster with the exception of some brands. This may indicate that most brands present very similar products in terms of nutritional values. The outlier is Milk Kefir, while it's possible to see other brands with a bit of distancing from the center of the cluster (for example, Fage and Danio Snack)

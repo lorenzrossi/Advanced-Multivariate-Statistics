@@ -1,0 +1,159 @@
+---
+title: "Homework_LorenzoRossi"
+author: "Lorenzo Rossi"
+date: "13/11/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+packages
+
+```{r include=FALSE}
+library(Ryacas)
+library(mosaic)
+library(stats)
+library(dplyr)
+library(bootstrap)
+library(boot)
+library(GGMnonreg)
+library(psych)
+
+```
+
+Part 1
+
+By looking at the function and recalling the theory, a CDF presents a value of 0 whether the limit of x (or the unknown value of interest) goes to -Inf. On the contrary, its value is 1 when the limit of x goes to Inf (positively).
+Considering the function "1-exp((-1/8)*x^2)" it's possible to check the aforementioend properties by solving the funtion with lim(x -> Inf). Because of the minus sign of -1/8, the power of exp becomes -Inf and with such value, exp becomes 0. Thus, the function gets reducted to 1 - 0, confirming the properties of a CDF.
+
+
+Part 2
+
+Computing MANOVA test on ratings in the CustomerCare dataset, identifying Education as the group variable   
+
+```{r echo=TRUE}
+dt <- read.csv("C:\\Users\\loren\\Desktop\\Lezioni uni\\Adv Multivariate Statistics\\R practise\\CustomerCare.csv", header = T, sep = ";")
+
+rating <- cbind(dt$Rating_price, dt$Rating_quality)
+
+man <- manova(rating ~ Education, data = dt)
+summary(man, intercept = TRUE)
+
+summary.aov(man)
+```
+
+Computing single ANOVA tests
+
+```{r echo=TRUE}
+aovprice <- aov(Rating_price ~ Education, data = dt)
+summary(aovprice)
+
+aovquality <- aov(Rating_quality ~ Education, data = dt)
+summary(aovquality)
+
+```
+
+From the Manova test it looks like "Education" is not an impactful variable for quality and price ratings. By looking at the p-value (0.7301) and at the Pillai's trace (0.00212), its significance is very low. 
+
+In terms of significance, the situation doesn't change when computing single ANOVA tests. One of the few differences is that Education presents a lower mean squared error when related to price ratings, if compared to quality ratings, but it presents also an higher P-value (0,712). However, a non-significant P-value is also present in quality ratings (0,461).
+
+All of this suggests that there's no significant difference in education levels in terms of ratings.
+
+---
+
+Bootstrap
+
+The classical bootstrap was performed in both the iterative and the package procedure. The Fisher transformation was performed in the iterative one, while the Pearson correlation was tested in the package one.  
+
+```{r}
+ratingage <- cbind(dt$Rating_price, dt$Age)
+data <- data.frame(ratingage)
+colnames(data) <- c("Rating_price", "Age")
+
+#Iterative procedure
+
+n<-dim(data)[1]
+
+B<-1000
+
+#vector to store bootstrap r values:
+bootstrap.r.values=rep(0,B)
+
+#bootstrap loop
+
+for (i in 1:B) {
+  bootsample.indexes<-sample(1:n, replace=TRUE)
+  bootstrap.sample<-data[bootsample.indexes,]
+  r<-cor(bootstrap.sample$Age,bootstrap.sample$Rating_price)
+  bootstrap.r.values[i]<-r
+}
+
+bootstrap.r.values = sort(bootstrap.r.values)
+
+fisherz(r)
+
+
+low <- bootstrap.r.values[.05*B] 
+up <- bootstrap.r.values[.95*B + 1]
+
+#Plot bootstrap CIs
+hist(bootstrap.r.values, col="red", n=50, xlab="Bootstrap r values")
+abline(v = low, col="blue")
+abline(v= up, col="blue")
+legend("topleft", legend="Fisher's z CIs", col="blue", lty=c(1,1), 
+       lwd=c(1,1))
+
+
+#Pearson CIs
+set.seed(123)
+
+b3 <- boot(data = data, statistic = function(data, i) {
+  cor(data[i, "Rating_price"], data[i, "Age"], method = "pearson")
+           },
+           R = 1000
+)
+b3
+
+# get 95% confidence interval
+boot.ci(b3, type = "perc")
+
+plot(density(b3$t))
+low2<-quantile(b3$t, 0.05)
+up2<-quantile(b3$t, 0.95)
+abline(v = low2, col = "green", lwd=2)
+abline(v = up2, col = "green", lwd=2)
+
+
+```
+
+From the plottings and the results we see that Fisher's test and Pearson't test present very similar values, as well as the distribution of r values. However, the relation between price ratings and age doesn't seem to be particularly strong, as the distributions suggest. On the contrary, confidence intervals go from just slightly negative values to low positive correlation (<0.20).
+
+---
+
+The last part consisted in computing the confidence interval for Y (price ratings) and X (quality ratings). The package bootstrap was implemented, inserting the formula for a linear model between Y and X.
+
+```{r}
+ratings <- cbind(dt$Rating_price, dt$Rating_quality)
+ratings <- data.frame(ratings)
+colnames(ratings) <- c("Y", "X")
+
+rsq <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample
+  fit <- lm(formula, data=d)
+  return(summary(fit)$r.square)
+}
+# bootstrapping with 1000 replications
+results <- boot(data = ratings, statistic=rsq,
+                R=1000, formula=Y~X)
+
+# view results
+results
+plot(results)
+
+# get 95% confidence interval
+boot.ci(results, type="perc")
+```
+
+In this last case, we can see a medium-to-high level of correlation between the two variables.
