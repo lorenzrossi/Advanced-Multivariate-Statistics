@@ -1,2 +1,2 @@
 # Advanced-Multivariate-Statistics
-AMS projects
+AMS projects + Exam project (Rmd + Latex paper)
