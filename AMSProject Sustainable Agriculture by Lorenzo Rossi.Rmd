@@ -1,0 +1,375 @@
+---
+title: 'Advanced Multivariate Statistics. Methods and models applied to agricultural systems and sustainability'
+author: "Lorenzo Rossi, University of Milan"
+date: "18/01/2022"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  word_document: default
+  html_document: default
+abstract: This research applies different multivariate analysis on different variables
+  related to agriculture in more than two hundred Countries. The methods that were
+  used include Canonical Correlation, Bootstrap, K-Medoids and Principal Component
+  Analysis. Different correlations have been found. Nitrous oxide and methane emissions
+  deeply affects agricultural systems, as well as they grow along with rural population,
+  business regulations affect water and fertilizer usage, technology improves the
+  yield of crops.
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Introduction 
+
+
+Agriculture plays a critical role in the global economy. With the continuing expansion of the human population understanding which are the key factors that lead to sustainable systems of agriculture is of utmost importance for food security challenges and reduction the impacts of climate change.
+
+
+The dataset for this research were retrieved from the [World Bank database](https://databank.worldbank.org/indicator/NY.GDP.MKTP.KD.ZG/1ff4a498/Popular-Indicators). It contains several variables which relate to crop production, livestock production, water usage in agriculture, employment in agriculture, value added to GDP, emissions (methane and nitrous oxide), rural population and the CPIA environmental rating (which goes from 1 to 6). The goal was to identify correlations among variables in order to make inference and understand the main factors of agricultural sustainability and production.
+
+
+```{r include=FALSE}
+
+library(car)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(ggpubr)
+library(ggplot2)
+library(Hmisc)
+library(tidyverse)
+library(caret)
+library(Metrics)
+library(RCurl)
+library(ISLR)
+library(plot3D)
+library(sjPlot)
+library(plotly)
+library(haven)
+library(corrplot)
+library(plyr)
+library(PerformanceAnalytics)
+library(gbm)
+library(randomForest)
+library(FactoMineR)
+library(factoextra)
+library(cluster)
+library(gridExtra)
+library(quantable)
+library(CCA)
+library(bootstrap)
+library(boot)
+library(GGMnonreg)
+library(psych)
+library(ppcor)
+library(heplots)
+library(pls)
+library(ggstatsplot)
+library(MASS)
+```
+
+```{r include=FALSE}
+data = read.csv('SADF2.csv')
+```
+
+```{r include=FALSE}
+row.names(data) <- data$Country
+data[1] <- NULL
+
+data <- data %>%
+  mutate_if(is.numeric, round, digits = 2)
+```
+
+
+First, it was decided to have an overview of the following variables: crop production index, livestock production index, CPIA for environmental sustainability and business regulations for environment. With the exception of the business variable, the other three present a normal bell-shaped curve, whereas the aforementioned variable presents no ratings higher than 4.
+
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="60%"}
+hist(data$CropProductionIndex, breaks = 100, xlab = 'Crop production index', main = ' ')
+hist(data$LivestockProductionIndex, breaks = 100, xlab = 'Livestock production index', main = ' ')
+hist(data$CPIAEnvironmentalSustainability, breaks = 30, xlab = 'CPIA Environment Sustainability', main = ' ')
+hist(data$CPIABusinessRegulatoryEnvironment, breaks = 30, main = ' ', xlab = 'Business regulations for environment')
+```
+
+# Models
+
+
+## Canonical Correlation
+
+
+The following step is to procede with the analysis of correlation among the variables. One way to do it is to perform the Canonical Correlation Analysis (CCA), which allows to compute the correlation of variables from two distinct datasets. The first comparison that is useful is between Canonical Correlation Analysis and Principal Component Analysis (PCA). Where PCA focuses on finding linear combinations that account for the most variance in one data set, Canonical Correlation Analysis focuses on finding linear combinations that account for the most correlation in two datasets, expressing the first in function of the second one.
+
+
+The first two datasets to be extracted and compared are formed by CerealProductionTons, CerealYieldzKgH, AgricultureValueAdded CPIAEnvironmentalSustainability, CPIABusinessRegulatoryEnvironment for the Y group, FertilizerConsumptionKgH, WaterProductivity AgriculturalLandKm2, AgriculturalMachinery, FreshwaterWithdrawalsAgriculture, EmploymentAgricultureTotal, RuralPop for the X group. Other than the rating variables, this time it was decided to inclued more _quantitative_ variables, rather than indices, and see how they performed.
+
+
+The analysis leads to the conclusion that there is correlation between machinery and cereal yield. One hypothesis is that more and better technologies may improve the production of crops.
+Another correlation is present within the variables of water productiviy, business CPIA and fertilizer consumption. Maybe higher ratings are given to Countries whose agricultural businesses tend to reduce water waste and to improve the use of fertilizers.
+Another correlation is found between the tons of cereal production andnthe area of agricultural land. 
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="70%"}
+Y = data[,c(3,4,12,22,23)]
+X = data[,c(5:8,14,15,20)]
+cca1 <- cc(X,Y)
+plt.cc(cca1, var.label = TRUE)
+```
+
+
+The second CCA sees the variables related to emissions (total ghg gasses, methane and nitrous oxide) in group Y compared to CerealProductionTons, FertilizerConsumptionKgH, AgriculturalLandKm2, AgriculturalMachinery, AgricultureValueAdded FreshwaterWithdrawalsAgriculture, RuralPop (group X). This choice was done in order to see the effect of economic and human presence inside the agricultural context. 
+
+
+As one could expect, greenhouse gas and nitrous oxide correlate with tons of crop production and value added to GDP. Methane emissions are more correlated with rural population. 
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="70%"}
+Y2 = data[,c(9,10,18)]
+X2 = data[,c(3,5,7,8,12,14,20)]
+cca2 <- cc(X2,Y2)
+plt.cc(cca2, var.label = TRUE)
+```
+
+
+The last correlation sees compared the variables in the two previous Y groups, but this doesn't add more to the previous two models, other than confirming the correlation between production, value added and emissions
+
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="70%"}
+Y3 = data[,c(3,4,12,22,23)]
+X3 = data[,c(9,10,18)]
+cca3 <- cc(X3,Y3)
+plt.cc(cca3, var.label = TRUE)
+```
+
+
+## Bootstrap
+
+
+Bootstrap is a resampling method where large numbers of samples of the same size are repeatedly drawn, with replacement, from a single original sample. By repeatedly sampling with replacement, bootstrap creates the resulting samples distribution a Gaussian distribution, which makes statistical inference (e.g., constructing a Confidence Interval) possible. It is performed in cases the distributional assumptions (above all normality) are not met, in presence of outliers, when the data size is small or there's high heteroskedasticity.
+
+This model was chosen in order to make inference and test the accuracy of the previous correlation analysis on specific variables
+
+
+The first couple of variables on which the bootstrap will be applied are CPIA rating for businesses and water productivity, as they seemed already correlated before. The bootstrap confirms (although a low value) the presence of positive correlation but the OLS shows a p-value too high, which rejects the presence of a linear dependence.
+
+```{r echo=FALSE}
+function_1 <- function(data, i){
+  d2 <- data[i,] 
+  return(cor(d2$CPIABusinessRegulatoryEnvironment, d2$WaterProductivity))
+}
+
+boot1 <- boot(data,function_1,R=1000)
+boot1
+boot.ci(boot1, type="perc")
+
+for (i in 1:1000) {
+  #Creating a resampled dataset from the sample data
+  sample_d = data[sample(1:nrow(data), nrow(data), replace = TRUE), ]
+  
+  #Running the regression on these data
+  model_bootstrap1 <- lm(CPIABusinessRegulatoryEnvironment ~ WaterProductivity, data = sample_d)
+  
+}
+
+summary(model_bootstrap1)
+```
+
+
+The second boostrap is applied to the correlation between cereal yields and machinery, confirming the previous hypothesis of a moderate level of positive interaction, both through correlation and OLS.
+
+
+```{r echo=FALSE}
+function_2 <- function(data, i){
+  d2 <- data[i,] 
+  return(cor(d2$CerealYieldzKgH, d2$AgriculturalMachinery))
+}
+
+boot2 <- boot(data,function_2,R=1000)
+boot2
+boot.ci(boot2, type="perc")
+
+for (i in 1:1000) {
+  #Creating a resampled dataset from the sample data
+  sample_d = data[sample(1:nrow(data), nrow(data), replace = TRUE), ]
+  
+  #Running the regression on these data
+  model_bootstrap2 <- lm(CerealYieldzKgH ~ AgriculturalMachinery, data = sample_d)
+  
+}
+
+summary(model_bootstrap2)
+```
+
+
+The next bootstrap will be applied to the previous apparent correlation between methane emissions and rural population, confirming again the interaction, both through correlation and OLS.
+
+
+```{r echo=FALSE}
+function_3 <- function(data, i){
+  d2 <- data[i,] 
+  return(cor(d2$RuralPop, d2$MethaneEmissions))
+}
+
+boot3 <- boot(data,function_3,R=1000)
+boot3
+boot.ci(boot3, type="perc")
+
+for (i in 1:1000) {
+  #Creating a resampled dataset from the sample data
+  sample_d = data[sample(1:nrow(data), nrow(data), replace = TRUE), ]
+  
+  #Running the regression on these data
+  model_bootstrap3 <- lm(MethaneEmissions ~ RuralPop, data = sample_d)
+  
+}
+
+summary(model_bootstrap3)
+```
+
+
+The last bootstrap was implemented after having noticed the relation between nitrous oxide emissions and agricultural land. Also in this case, the coefficients indicates the presence of high positive correlation and linear dependance. It is safe to assume that more land brings to the consume of more energy and to more emissions.
+
+
+```{r echo=FALSE}
+function_4 <- function(data, i){
+  d2 <- data[i,] 
+  return(cor(d2$NitrousOxideEmissions, d2$AgriculturalLandKm2))
+}
+
+boot4 <- boot(data,function_4,R=1000)
+boot4
+boot.ci(boot4, type="perc")
+
+for (i in 1:1000) {
+  #Creating a resampled dataset from the sample data
+  sample_d = data[sample(1:nrow(data), nrow(data), replace = TRUE), ]
+  
+  #Running the regression on these data
+  model_bootstrap4 <- lm(NitrousOxideEmissions ~ AgriculturalLandKm2, data = sample_d)
+  
+}
+
+summary(model_bootstrap4)
+```
+
+
+## K-Medoids
+
+
+The k-medoids algorithm is a clustering approach related to k-means clustering for partitioning a data set into k groups or clusters. In k-medoids clustering, each cluster is represented by one of the data point in the cluster. These points are named cluster medoids and correspond to the most centrally located points in each cluster. It is a robust alternative to k-means clustering. This means that, the algorithm is less sensitive to noise and outliers, compared to k-means, because it uses medoids as cluster centers instead of means (used in k-means).
+The k-medoids algorithm requires the user to specify k, the number of clusters to be generated (like in k-means clustering). Two useful approaches to determine the optimal number of clusters are the silhouette method and the within sum of square (wss).
+
+
+In this section, k-medoids will be implemented through the PAM algorithm (Partitioning Around Medoids).
+
+```{r include=FALSE}
+normalize <- function(x) {
+  return ((x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE)))}
+dt <- as.data.frame(lapply(data,normalize))
+```
+
+
+Both the silhouette and the wss methods define the presence of just two clusters, which present deeply different values for each variable. However, the first cluster tends to incorporate a high number of  values, even the ones that seems very distant from its center.
+
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="50%"}
+fviz_nbclust(dt, pam, method="silhouette")+theme_classic()
+fviz_nbclust(dt, pam, method="wss")+theme_classic()
+```
+
+```{r include=FALSE}
+kmed <- pam(dt, k = 2)
+kmed
+```
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="50%"}
+fviz_cluster(kmed, data = dt)
+```
+
+
+A second approach in the choice of K consists in computing the gap statistic, which compares, through a given number of bootstrapped iterations, the total intra-cluster variation for different values of k with their expected values for a distribution with no clustering.
+By computing this method, the number of clusters rises at 8. In this case, the outliers previously included in the bigger cluster are now a separate cluster. However, having more clusters with similar features brings to difficult interpretations of the results. 
+
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="50%"}
+gap_stat <- clusGap(dt,
+                    FUN = pam,
+                    K.max = 10, #max clusters to consider
+                    B = 100) #total bootstrapped iterations
+
+fviz_gap_stat(gap_stat)
+```
+
+```{r include=FALSE}
+kmed2 <- pam(dt, k = 8)
+kmed2
+```
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="50%"}
+fviz_cluster(kmed2, data = dt)
+```
+
+## Principal Component Analysis
+
+
+The last model implemented in this research. 
+PCA is used in exploratory data analysis and for making decisions in predictive models. It is commonly used for dimensionality reduction by using each data point onto only the first few principal components (most cases first and second dimensions) to obtain lower-dimensional data while keeping as much of the data’s variation as possible.
+The first principal component can equivalently be defined as a direction that maximizes the variance of the projected data.
+The PCA is a technique which gives a low dimensional representation of data. In other words, it identifies the direction among the feature space where the data vary the most and that is more relevant to explain how data are spread in the our space. The PCA is useful for visualization because we can project data along this dimension to understand a good part of data distribution. 
+
+
+In this case, the model identifies two components that explain around 30% of the variance in the dataset.
+
+```{r include=FALSE}
+z_scores <- as.data.frame(sapply(dt, function(dt) (abs(dt-mean(dt))/sd(dt))))
+head(z_scores)
+
+dt <- z_scores[!rowSums(z_scores>3), ]
+```
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="50%"}
+res.pca <- prcomp(dt, scale = TRUE)
+
+fviz_eig(res.pca)
+```
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="50%"}
+fviz_pca_ind(res.pca,
+             col.ind = "cos2", # Color by the quality of representation
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = T     # Avoid text overlapping
+)
+
+
+```
+
+```{r echo=FALSE, fig.align="center", message=FALSE, out.width="70%"}
+fviz_pca_var(res.pca,
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = T     # Avoid text overlapping
+)
+```
+
+
+The plot shows the contribution of each variable the the variance, as well as their relations, by looking at the directions of the arrows. Employment, emissions, rural population and valued added to GDP are the variables that stands out. Emissions and rural population have opposite directions in respect to environment-friendly variables such as CPIA rating, water productivity and cereal yields, meaning that these two groups of variables affect the variance in the opposite way.
+Finally, by looking at the coefficients of the PCA, it's possible to denote employment and emissions as the main factors that influence variance in the data.
+
+
+```{r echo=FALSE}
+eig.val <- get_eigenvalue(res.pca)
+eig.val
+```
+
+```{r include=FALSE}
+res.var <- get_pca_var(res.pca)
+res.var$contrib        # Contributions to the PCs
+```
+
+
+
+# Conclusion
+
+
+The paper had the aim to analyse the main factors that influence agricultural systems around the globe. Some important correlations have been found. More human activity in rural areas lead to an increase of emissions (agriculture is the main sector who produces methane emissions, one of the most nocive GHG). High ratings of environmental sustainability are given to Countris who present higher values of water productivity and improvement of fertilizers, even if the two factors do not linear dependance. Crop yields may improve from the implementation of more machinery and technology. Generally, what affects agriculture the most is employment and emissions, highly correlate with the level of human activity and agricultural land. 
+
+
